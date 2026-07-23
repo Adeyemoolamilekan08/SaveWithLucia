@@ -1,0 +1,76 @@
+<?php
+// ============================================================
+// includes/auth.php — FIXED for all browsers + Opera Mini
+// ============================================================
+
+if (session_status() === PHP_SESSION_NONE) {
+    // Fix for Opera Mini, Safari ITP, and cleared-cookie issues
+    // Do NOT set SameSite=Lax — breaks Opera Mini and some Android browsers
+    ini_set('session.cookie_httponly',  1);
+    ini_set('session.use_strict_mode',  1);
+    ini_set('session.use_only_cookies', 1);
+    ini_set('session.cookie_lifetime',  0); // 0 = until browser closes
+    ini_set('session.gc_maxlifetime',   86400); // 24 hours
+    // Do NOT set cookie_samesite — causes Opera Mini login failures
+    session_start();
+}
+
+function isLoggedIn() {
+    return !empty($_SESSION['user_id']) && !empty($_SESSION['role']);
+}
+
+function isAdmin() {
+    return isLoggedIn() && $_SESSION['role'] === 'admin';
+}
+
+// Use relative redirect — avoids SITE_URL mismatch issues
+function redirectTo($url) {
+    $url = rtrim($url, '/');
+    if (headers_sent()) {
+        // Fallback for hosts that output before headers
+        echo '<script>window.location.href="' . htmlspecialchars($url) . '";</script>';
+        echo '<meta http-equiv="refresh" content="0;url=' . htmlspecialchars($url) . '">';
+    } else {
+        header("Location: " . $url, true, 302);
+    }
+    exit();
+}
+
+function requireLogin() {
+    if (!isLoggedIn()) {
+        redirectTo(SITE_URL . "/pages/login.php");
+    }
+    if (!empty($_SESSION['status']) && $_SESSION['status'] === 'suspended') {
+        session_destroy();
+        redirectTo(SITE_URL . "/pages/login.php?err=suspended");
+    }
+}
+
+function requireAdmin() {
+    if (!isLoggedIn() || !isAdmin()) {
+        redirectTo(SITE_URL . "/pages/login.php");
+    }
+}
+
+function requireGuest() {
+    if (isLoggedIn()) {
+        $dest = isAdmin()
+            ? SITE_URL . "/admin/index.php"
+            : SITE_URL . "/pages/dashboard.php";
+        redirectTo($dest);
+    }
+}
+
+function setFlash($type, $message) {
+    $_SESSION['flash'] = ['type' => $type, 'message' => $message];
+}
+
+function getFlash() {
+    if (isset($_SESSION['flash'])) {
+        $f = $_SESSION['flash'];
+        unset($_SESSION['flash']);
+        return $f;
+    }
+    return null;
+}
+?>

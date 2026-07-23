@@ -1,0 +1,5 @@
+.env
+error_log
+swl_error_log/
+vendor/
+*.log
